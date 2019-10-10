@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
     int prime;        /* Current prime */
     int size;         /* Elements in 'marked' */
 
-
     MPI_Init(&argc, &argv);
 
     /* Start the timer */
@@ -46,6 +45,30 @@ int main(int argc, char *argv[]) {
     high_value = 1 + (id + 1) * (n - 1) / p;
     size = high_value - low_value + 1;
 
+    // 先筛出前 sqrt(n) 个数中的所有素数
+    int sqrt_size = int(sqrt(double(n))) + 1;
+    // pre_primes[i] = 0 说明 i 是素数
+    char* pre_primes = (char*)malloc(sqrt_size * sizeof(sqrt_size));
+    if(pre_primes == NULL)
+    {
+        printf("Cannot allocate enough memory\n");
+        MPI_Finalize();
+        exit(1);
+    }
+    // 先全部清零
+    memset(pre_primes, 0, sqrt_size * sizeof(sqrt_size));
+    for(i = 2; i <= sqrt_size; i++)
+    {
+        // 如果 i 是素数，那么就跳过，因为它的倍数必然已经被前面的数筛过了
+        if(pre_primes[i])
+            continue;
+        // i 是素数，那么它的所有倍数都不是素数
+        for(int j = i * 2; j <= sqrt_size; j += i)
+        {
+            pre_primes[j] = 1;
+        }
+    }
+
     /* Bail out if all the primes used for sieving are
        not all held by process 0 */
 
@@ -68,7 +91,8 @@ int main(int argc, char *argv[]) {
     }
 
     for (i = 0; i < size; i++) marked[i] = 0;
-    if (!id) index = 0;
+//    if (!id) index = 0;
+    index = 2;
     prime = 2;
     do {
         if (prime * prime > low_value)
@@ -78,16 +102,19 @@ int main(int argc, char *argv[]) {
             else first = prime - (low_value % prime);
         }
         for (i = first; i < size; i += prime) marked[i] = 1;
-        if (!id) {
-            while (marked[++index]);
-            prime = index + 2;
-        }
-        if (p > 1) MPI_Bcast(&prime, 1, MPI_INT, 0, MPI_COMM_WORLD);
+//        if (!id) {
+            while (pre_primes[++index]);
+            prime = index;
+//        }
+//  因为每个进程已经预先筛出前 sqrt(n) 个数中的素数，所以不需要广播来查询下一个素数
+//        if (p > 1) MPI_Bcast(&prime, 1, MPI_INT, 0, MPI_COMM_WORLD);
     } while (prime * prime <= n);
     count = 0;
     for (i = 0; i < size; i++)
         if (!marked[i]) count++;
+    // 释放内存
     free(marked);
+    free(pre_primes);
     if (p > 1)
         MPI_Reduce(&count, &global_count, 1, MPI_INT, MPI_SUM,
                    0, MPI_COMM_WORLD);

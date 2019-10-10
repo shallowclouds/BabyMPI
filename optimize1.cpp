@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
     int prime;        /* Current prime */
     int size;         /* Elements in 'marked' */
 
-
     MPI_Init(&argc, &argv);
 
     /* Start the timer */
@@ -67,9 +66,15 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    for (i = 0; i < size; i++) marked[i] = 0;
-    if (!id) index = 0;
-    prime = 2;
+    // 除 2 以外的偶数都设为 1，避免后面计算
+    for (i = 0; i < size; i++)
+        if ((i + low_value) % 2 == 0 && (i + low_value) != 2)
+            marked[i] = 1;
+        else
+            marked[i] = 0;
+    if (!id) index = 1;
+    // 第一个素数设置为 3
+    prime = 3;
     do {
         if (prime * prime > low_value)
             first = prime * prime - low_value;
